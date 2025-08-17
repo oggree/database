@@ -39,7 +39,9 @@ func GetPostgreSQLClient() *gorm.DB {
 	username := viper.GetString("database.username")
 	password := viper.GetString("database.password")
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", username, password, host, port, database)
+	sslMode := viper.GetString("database.sslMode")
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", username, password, host, port, database, sslMode)
 	//dsnRead := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", username, password, hostRead, port, database)
 
 	logger.Info(":::Database Details::: user: " + username + " host : " + host + " port: " + port + " dbname: " + database)
