@@ -1,4 +1,4 @@
-module database
+module github.com/oggree/database
 
 go 1.24
 
