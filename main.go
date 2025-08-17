@@ -43,7 +43,7 @@ func GetPostgreSQLClient() *gorm.DB {
 	//dsnRead := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", username, password, hostRead, port, database)
 
 	logger.Info(":::Database Details::: user: " + username + " host : " + host + " port: " + port + " dbname: " + database)
-	//logger.Info(":::Database Details Read::: user: " + username + " host : " + hostRead + " port: " + port + " dbname: " + database)
+	//logger.Info(":::Database Details For Read::: user: " + username + " host : " + hostRead + " port: " + port + " dbname: " + database)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: gormLogger.Default.LogMode(gormLogger.Info),
