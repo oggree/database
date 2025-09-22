@@ -7,6 +7,7 @@ import (
 
 	"github.com/oggree/logger"
 	"github.com/spf13/viper"
+	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
@@ -17,37 +18,56 @@ type DatabaseClient struct {
 	DB *gorm.DB
 }
 
-var singleton *DatabaseClient
+var singletonInstanceList = make(map[string]*DatabaseClient)
 
-func GetInstance() *DatabaseClient {
-	if singleton == nil {
+func GetInstance(connectionName string) *DatabaseClient {
+	if singletonInstanceList[connectionName] == nil {
 		var once sync.Once
 		once.Do(func() {
-			singleton = &DatabaseClient{DB: GetPostgreSQLClient()}
+			singletonInstanceList[connectionName] = &DatabaseClient{DB: GetSQLClient(connectionName)}
 		})
 	}
-	return singleton
+	return singletonInstanceList[connectionName]
 }
 
-func GetPostgreSQLClient() *gorm.DB {
-	host := viper.GetString("database.host")
+func GetSQLClient(connectionName string) *gorm.DB {
+	connectionType := viper.GetString(fmt.Sprintf("database.%s.type", connectionName))
+
+	host := viper.GetString(fmt.Sprintf("database.%s.host", connectionName))
 	//hostRead := viper.GetString("database.hostRead")
-	database := viper.GetString("database.database")
 
-	port := viper.GetString("database.port")
+	database := viper.GetString(fmt.Sprintf("database.%s.database", connectionName))
 
-	username := viper.GetString("database.username")
-	password := viper.GetString("database.password")
+	port := viper.GetString(fmt.Sprintf("database.%s.port", connectionName))
 
-	sslMode := viper.GetString("database.sslMode")
+	username := viper.GetString(fmt.Sprintf("database.%s.username", connectionName))
+	password := viper.GetString(fmt.Sprintf("database.%s.password", connectionName))
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", username, password, host, port, database, sslMode)
-	//dsnRead := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", username, password, hostRead, port, database)
+	sslMode := viper.GetString(fmt.Sprintf("database.%s.sslMode", connectionName))
 
-	logger.Info(":::Database Details::: user: " + username + " host : " + host + " port: " + port + " dbname: " + database)
-	//logger.Info(":::Database Details For Read::: user: " + username + " host : " + hostRead + " port: " + port + " dbname: " + database)
+	var dbDial gorm.Dialector
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	replicas := []gorm.Dialector{}
+
+	if connectionType == "postgres" {
+		dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", username, password, host, port, database, sslMode)
+		//dsnRead := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", username, password, hostRead, port, database)
+
+		logger.Info(":::Database Details::: user: " + username + " host : " + host + " port: " + port + " dbname: " + database)
+		//logger.Info(":::Database Details For Read::: user: " + username + " host : " + hostRead + " port: " + port + " dbname: " + database)
+
+		dbDial = postgres.Open(dsn)
+	} else if connectionType == "mysql" {
+		dsn := username + ":" + password + "@tcp(" + host + ":" + port + ")/" + database + "?charset=utf8mb4&parseTime=True&loc=Local"
+
+		logger.Info(":::Database Details::: user: " + username + " host : " + host + " port: " + port + " dbname: " + database)
+
+		dbDial = mysql.Open(dsn)
+	} else {
+
+	}
+
+	db, err := gorm.Open(dbDial, &gorm.Config{
 		Logger: gormLogger.Default.LogMode(gormLogger.Info),
 	})
 
@@ -59,9 +79,7 @@ func GetPostgreSQLClient() *gorm.DB {
 	db.Use(dbresolver.Register(dbresolver.Config{
 		// use `db2` as sources, `db3`, `db4` as replicas
 		//Sources:  []gorm.Dialector{mysql.Open("db2_dsn")},
-		Replicas: []gorm.Dialector{
-			//postgres.Open(dsnRead)
-		},
+		Replicas: replicas,
 		// sources/replicas load balancing policy
 		Policy: dbresolver.RandomPolicy{},
 		// print sources/replicas mode in logger
