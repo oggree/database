@@ -2,6 +2,8 @@ package database
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
 	"gorm.io/plugin/dbresolver"
@@ -63,8 +66,16 @@ func GetSQLClient(connectionName string) *gorm.DB {
 		logger.Info(":::Database Details::: user: " + username + " host : " + host + " port: " + port + " dbname: " + database)
 
 		dbDial = mysql.Open(dsn)
-	} else {
+	} else if connectionType == "sqlite" {
+		dbPath := filepath.Join("data", "db", fmt.Sprintf("%s.db", database))
 
+		if err := os.MkdirAll(filepath.Dir(dbPath), os.ModePerm); err != nil {
+			logger.Error("Error creating directory:", err)
+		}
+
+		dbDial = sqlite.Open(dbPath)
+	} else {
+		logger.Error("Invalid connection type: "+connectionType, nil)
 	}
 
 	db, err := gorm.Open(dbDial, &gorm.Config{
