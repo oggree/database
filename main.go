@@ -115,7 +115,7 @@ func GetSQLClient(connectionName string) *gorm.DB {
 	})
 
 	if err != nil {
-		logger.Error("Error while connecting to PostgreSQL", err)
+		logger.Error("Error while connecting to database", err)
 		return nil
 	}
 
