@@ -1,6 +1,6 @@
 # oggree/database
 
-This module provides a unified, thread-safe database connection manager for the `oggree` ecosystem. It is built on top of [GORM](https://gorm.io/) and uses [Viper](https://github.com/spf13/viper) for configuration management.
+This module provides a unified, thread-safe database connection manager for the `oggree` ecosystem. It is built on top of [GORM](https://gorm.io/) and uses [oggree/config](https://github.com/oggree/config) for configuration management.
 
 ## Features
 
@@ -8,14 +8,14 @@ This module provides a unified, thread-safe database connection manager for the 
 - **Connection Pooling:** Configured globally with sensible defaults (Max idle conns: 10, Max open conns: 30, Conn max lifetime: 10 mins).
 - **Thread-safe Singletons:** Each named connection is instantiated exactly once using `sync.Once` and cached in a map.
 - **Read/Write Splitting & Load Balancing:** Integrated with GORM's `dbresolver` plugin. Ready to adapt for source/replica architecture using a random load-balancing policy.
-- **Configuration via Viper:** Loads dynamically from central configurations using `viper.GetString`.
+- **Configuration via `oggree/config`:** Loads dynamically from central configurations using `config.GetString`.
 - **Integrated Logging:** Uses the custom `github.com/oggree/logger` for system logs, and GORM's default logger initialized at the `Info` level for SQL tracing.
 
 ## Usage
 
 ### 1. Configuration Setup
 
-The module expects configuration properties to be loaded into Viper. For a given `connectionName` (e.g., `default`), the expected configuration keys will be:
+The module expects configuration properties to be loaded into the `oggree/config` library. For a given `connectionName` (e.g., `default`), the expected configuration keys will be:
 
 ```yaml
 database:
@@ -47,7 +47,7 @@ import (
 )
 
 func main() {
-	// Let's assume viper is already initialized here with the proper variables loaded.
+	// Let's assume config is already initialized here with the proper variables loaded.
 	
 	dbClient := database.GetInstance("default")
 	if dbClient == nil {
@@ -71,5 +71,5 @@ When extending this module or integrating it into other services:
 - **Concurrency & Scaling:** Rely on `GetInstance` for obtaining connections across multiple goroutines, as it safely scopes multiple database variants without generating overhead. Do not directly call `GetSQLClient` unless you explicitly want to instantiate a fresh connection rather than reusing the singleton.
 
 ## Module Info
-- **Dependencies:** `gorm.io/gorm`, `gorm.io/driver/postgres`, `gorm.io/driver/mysql`, `gorm.io/driver/sqlite`, `github.com/spf13/viper`, `github.com/oggree/logger`
+- **Dependencies:** `gorm.io/gorm`, `gorm.io/driver/postgres`, `gorm.io/driver/mysql`, `gorm.io/driver/sqlite`, `github.com/oggree/config`, `github.com/oggree/logger`
 - **Go Version:** `>= 1.25.0`

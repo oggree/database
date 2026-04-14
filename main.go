@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/oggree/logger"
-	"github.com/spf13/viper"
+	"github.com/oggree/config"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -34,19 +34,19 @@ func GetInstance(connectionName string) *DatabaseClient {
 }
 
 func GetSQLClient(connectionName string) *gorm.DB {
-	connectionType := viper.GetString(fmt.Sprintf("database.%s.type", connectionName))
+	connectionType := config.GetString(fmt.Sprintf("database.%s.type", connectionName))
 
-	host := viper.GetString(fmt.Sprintf("database.%s.host", connectionName))
-	//hostRead := viper.GetString("database.hostRead")
+	host := config.GetString(fmt.Sprintf("database.%s.host", connectionName))
+	//hostRead := config.GetString("database.hostRead")
 
-	database := viper.GetString(fmt.Sprintf("database.%s.database", connectionName))
+	database := config.GetString(fmt.Sprintf("database.%s.database", connectionName))
 
-	port := viper.GetString(fmt.Sprintf("database.%s.port", connectionName))
+	port := config.GetString(fmt.Sprintf("database.%s.port", connectionName))
 
-	username := viper.GetString(fmt.Sprintf("database.%s.username", connectionName))
-	password := viper.GetString(fmt.Sprintf("database.%s.password", connectionName))
+	username := config.GetString(fmt.Sprintf("database.%s.username", connectionName))
+	password := config.GetString(fmt.Sprintf("database.%s.password", connectionName))
 
-	sslMode := viper.GetString(fmt.Sprintf("database.%s.sslMode", connectionName))
+	sslMode := config.GetString(fmt.Sprintf("database.%s.sslMode", connectionName))
 
 	var dbDial gorm.Dialector
 
@@ -58,7 +58,7 @@ func GetSQLClient(connectionName string) *gorm.DB {
 		Purpose string `mapstructure:"purpose"`
 	}
 	var nodes []NodeConfig
-	viper.UnmarshalKey(fmt.Sprintf("database.%s.replicas", connectionName), &nodes)
+	config.UnmarshalKey(fmt.Sprintf("database.%s.replicas", connectionName), &nodes)
 
 	if connectionType == "postgres" {
 		dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", username, password, host, port, database, sslMode)
