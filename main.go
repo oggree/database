@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/oggree/logger"
 	"github.com/oggree/config"
+	"github.com/oggree/logger"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -60,7 +60,8 @@ func GetSQLClient(connectionName string) *gorm.DB {
 	var nodes []NodeConfig
 	config.UnmarshalKey(fmt.Sprintf("database.%s.replicas", connectionName), &nodes)
 
-	if connectionType == "postgres" {
+	switch connectionType {
+	case "postgres":
 		dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", username, password, host, port, database, sslMode)
 		//dsnRead := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", username, password, hostRead, port, database)
 
@@ -80,7 +81,7 @@ func GetSQLClient(connectionName string) *gorm.DB {
 				logger.Info(":::Added Postgres Read Replica::: host : " + node.Host)
 			}
 		}
-	} else if connectionType == "mysql" {
+	case "mysql":
 		dsn := username + ":" + password + "@tcp(" + host + ":" + port + ")/" + database + "?charset=utf8mb4&parseTime=True&loc=Local"
 
 		logger.Info(":::Database Details::: user: " + username + " host : " + host + " port: " + port + " dbname: " + database)
@@ -98,7 +99,7 @@ func GetSQLClient(connectionName string) *gorm.DB {
 				logger.Info(":::Added MySQL Read Replica::: host : " + node.Host)
 			}
 		}
-	} else if connectionType == "sqlite" {
+	case "sqlite":
 		dbPath := filepath.Join("data", "db", fmt.Sprintf("%s.db", database))
 
 		if err := os.MkdirAll(filepath.Dir(dbPath), os.ModePerm); err != nil {
@@ -106,7 +107,7 @@ func GetSQLClient(connectionName string) *gorm.DB {
 		}
 
 		dbDial = sqlite.Open(dbPath)
-	} else {
+	default:
 		logger.Error("Invalid connection type: "+connectionType, nil)
 	}
 
