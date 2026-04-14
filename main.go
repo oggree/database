@@ -50,7 +50,15 @@ func GetSQLClient(connectionName string) *gorm.DB {
 
 	var dbDial gorm.Dialector
 
-	replicas := []gorm.Dialector{}
+	var replicas []gorm.Dialector
+	var sources []gorm.Dialector
+
+	type NodeConfig struct {
+		Host    string `mapstructure:"host"`
+		Purpose string `mapstructure:"purpose"`
+	}
+	var nodes []NodeConfig
+	viper.UnmarshalKey(fmt.Sprintf("database.%s.replicas", connectionName), &nodes)
 
 	if connectionType == "postgres" {
 		dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", username, password, host, port, database, sslMode)
@@ -60,12 +68,36 @@ func GetSQLClient(connectionName string) *gorm.DB {
 		//logger.Info(":::Database Details For Read::: user: " + username + " host : " + hostRead + " port: " + port + " dbname: " + database)
 
 		dbDial = postgres.Open(dsn)
+
+		for _, node := range nodes {
+			repDSN := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", username, password, node.Host, port, database, sslMode)
+			dialector := postgres.Open(repDSN)
+			if node.Purpose == "write" {
+				sources = append(sources, dialector)
+				logger.Info(":::Added Postgres Write Node::: host : " + node.Host)
+			} else {
+				replicas = append(replicas, dialector)
+				logger.Info(":::Added Postgres Read Replica::: host : " + node.Host)
+			}
+		}
 	} else if connectionType == "mysql" {
 		dsn := username + ":" + password + "@tcp(" + host + ":" + port + ")/" + database + "?charset=utf8mb4&parseTime=True&loc=Local"
 
 		logger.Info(":::Database Details::: user: " + username + " host : " + host + " port: " + port + " dbname: " + database)
 
 		dbDial = mysql.Open(dsn)
+
+		for _, node := range nodes {
+			repDSN := username + ":" + password + "@tcp(" + node.Host + ":" + port + ")/" + database + "?charset=utf8mb4&parseTime=True&loc=Local"
+			dialector := mysql.Open(repDSN)
+			if node.Purpose == "write" {
+				sources = append(sources, dialector)
+				logger.Info(":::Added MySQL Write Node::: host : " + node.Host)
+			} else {
+				replicas = append(replicas, dialector)
+				logger.Info(":::Added MySQL Read Replica::: host : " + node.Host)
+			}
+		}
 	} else if connectionType == "sqlite" {
 		dbPath := filepath.Join("data", "db", fmt.Sprintf("%s.db", database))
 
@@ -87,19 +119,31 @@ func GetSQLClient(connectionName string) *gorm.DB {
 		return nil
 	}
 
-	db.Use(dbresolver.Register(dbresolver.Config{
-		// use `db2` as sources, `db3`, `db4` as replicas
-		//Sources:  []gorm.Dialector{mysql.Open("db2_dsn")},
-		Replicas: replicas,
-		// sources/replicas load balancing policy
-		Policy: dbresolver.RandomPolicy{},
-		// print sources/replicas mode in logger
-		TraceResolverMode: true,
-	}).
-		SetConnMaxIdleTime(10 * time.Minute).
-		SetConnMaxLifetime(10 * time.Minute).
-		SetMaxIdleConns(10).
-		SetMaxOpenConns(30))
+	if len(replicas) > 0 || len(sources) > 0 {
+		db.Use(dbresolver.Register(dbresolver.Config{
+			Sources:           sources,
+			Replicas:          replicas,
+			Policy:            dbresolver.RandomPolicy{},
+			TraceResolverMode: true,
+		}).
+			SetConnMaxIdleTime(10 * time.Minute).
+			SetConnMaxLifetime(10 * time.Minute).
+			SetMaxIdleConns(10).
+			SetMaxOpenConns(30))
+	} else {
+		// Even if no replicas, keeping the dbresolver helps with uniformity or future dynamic extensions,
+		// but it's optional. It was present before, so we can keep it for sources/replicas structure.
+		db.Use(dbresolver.Register(dbresolver.Config{
+			Sources:           sources,
+			Replicas:          replicas,
+			Policy:            dbresolver.RandomPolicy{},
+			TraceResolverMode: true,
+		}).
+			SetConnMaxIdleTime(10 * time.Minute).
+			SetConnMaxLifetime(10 * time.Minute).
+			SetMaxIdleConns(10).
+			SetMaxOpenConns(30))
+	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
